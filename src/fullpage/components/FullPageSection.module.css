@@ -5,7 +5,7 @@
   margin: 0;
 }
 
-.FullPagePanel {
+.FullPageSection {
   display: flex;
   -webkit-transition: transform 0.8s ease-in-out 0s;
   transition: transform 0.8s ease-in-out 0s;

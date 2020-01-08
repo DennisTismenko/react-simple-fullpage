@@ -4,14 +4,15 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useState,
 } from 'react';
-import classes from './style/FullPagePanel.module.css';
+import classes from './FullPageSection.module.css';
 import {getScrollDirection, getArrowDirection} from '../../util/navUtil';
 import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
 import {getCssTranslationStr, getFlexDirection} from '../../util/cssUtil';
+import {useFullPageContext} from '../context/FullPage.react';
 
-const FullPagePanel = ({direction, children}) => {
+const FullPageSection = ({direction, children}) => {
+  const {isHandlingAnimation, setHandlingAnimation} = useFullPageContext();
   const reducer = useCallback(
     (offset, scrollDirection) => {
       let newOffset = null;
@@ -29,16 +30,15 @@ const FullPagePanel = ({direction, children}) => {
         }
       }
       if (newOffset !== null && newOffset !== offset) {
-        setScrolling(true);
+        setHandlingAnimation(true);
         return newOffset;
       }
       return offset;
     },
-    [direction, children],
+    [direction, children, setHandlingAnimation],
   );
 
   const [offset, dispatch] = useReducer(reducer, 0);
-  const [isScrolling, setScrolling] = useState(false);
 
   const panelStyles = useMemo(() => {
     const styles = {
@@ -55,14 +55,14 @@ const FullPagePanel = ({direction, children}) => {
 
   const handleScrollAction = useCallback(
     scrollDirection => {
-      if (!isScrolling) {
+      if (!isHandlingAnimation) {
         dispatch(scrollDirection);
       }
     },
-    [isScrolling],
+    [isHandlingAnimation],
   );
 
-  // TODO: this implementation of KeyListener will NOT work for complex nested FullPagePanels, and thus should be deleted
+  // TODO: this implementation of KeyListener will NOT work for complex nested FullPageSections, and thus should be deleted
   useEffect(() => {
     const keyListener = e => {
       const arrowDirection = getArrowDirection(e);
@@ -77,13 +77,13 @@ const FullPagePanel = ({direction, children}) => {
   return (
     <div className={classes.FullPageContainer}>
       <div
-        className={classes.FullPagePanel}
+        className={classes.FullPageSection}
         style={panelStyles}
         onWheel={e => {
           handleScrollAction(getScrollDirection(e));
         }}
         onTransitionEnd={() => {
-          setScrolling(false);
+          setHandlingAnimation(false);
         }}
       >
         {Children.map(children, child => {
@@ -94,4 +94,4 @@ const FullPagePanel = ({direction, children}) => {
   );
 };
 
-export default FullPagePanel;
+export default FullPageSection;
