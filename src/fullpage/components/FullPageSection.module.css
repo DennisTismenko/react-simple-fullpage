@@ -10,9 +10,3 @@
   -webkit-transition: transform 0.8s ease-in-out 0s;
   transition: transform 0.8s ease-in-out 0s;
 }
-
-.Page {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-}
