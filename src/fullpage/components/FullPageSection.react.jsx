@@ -1,30 +1,40 @@
 import React, {
   Children,
-  useReducer,
   useCallback,
   useMemo,
-  // useEffect,
+  useState,
+  useEffect,
 } from 'react';
 import classes from './FullPageSection.module.css';
 import {getScrollDirection} from '../../util/navUtil';
 import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
 import {getCssTranslationStr, getFlexDirection} from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
+import Page from './Page.react';
 
-const reducer = (offset, action) => {
-  if (action.type === 'scroll') {
-    return action.scrollDirection === 'up' || action.scrollDirection === 'left'
-      ? offset - 1
-      : offset + 1;
-  } else if (action.type === 'navigate') {
-    return action.offset;
-  }
-};
+const FullPageSection = ({
+  direction,
+  children,
+  _navigate = null,
+  _setPathInParent = null,
+}) => {
+  const {
+    isHandlingAnimation,
+    setHandlingAnimation,
+    navigateTo,
+  } = useFullPageContext();
+  const [offset, setOffset] = useState(0);
+  const [childPaths, setChildPaths] = useState([]);
 
-const FullPageSection = ({direction, children, _navigate = null}) => {
-  const {isHandlingAnimation, setHandlingAnimation} = useFullPageContext();
-
-  const [offset, dispatch] = useReducer(reducer, 0);
+  useEffect(() => {
+    if (_setPathInParent) {
+      const path =
+        children[offset].type === Page
+          ? children[offset].props.path
+          : childPaths[offset];
+      _setPathInParent(path);
+    }
+  }, [_setPathInParent, offset, children, childPaths]);
 
   const panelStyles = useMemo(() => {
     const styles = {
@@ -39,39 +49,106 @@ const FullPageSection = ({direction, children, _navigate = null}) => {
     return styles;
   }, [direction, children, offset]);
 
-  const willAnimate = useCallback(
+  const willAnimateValue = useCallback(
     scrollDirection => {
       switch (direction) {
         case 'vertical':
-          return (
-            (scrollDirection === 'up' &&
-              decrementIfGte(offset, 0) !== offset) ||
-            (scrollDirection === 'down' &&
-              incrementIfLte(offset, Children.count(children) - 1) !== offset)
-          );
+          if (scrollDirection === 'up' || scrollDirection === 'down') {
+            const newValue =
+              scrollDirection === 'up'
+                ? decrementIfGte(offset, 0)
+                : incrementIfLte(offset, Children.count(children) - 1);
+            return [newValue !== offset, newValue !== offset ? newValue : null];
+          }
+          break;
         case 'horizontal':
-          return (
-            (scrollDirection === 'left' &&
-              decrementIfGte(offset, 0) !== offset) ||
-            (scrollDirection === 'right' &&
-              incrementIfLte(offset, Children.count(children) - 1) !== offset)
-          );
+          if (scrollDirection === 'left' || scrollDirection === 'right') {
+            if (scrollDirection === 'left' || scrollDirection === 'right') {
+              const newValue =
+                scrollDirection === 'left'
+                  ? decrementIfGte(offset, 0)
+                  : incrementIfLte(offset, Children.count(children) - 1);
+              return [
+                newValue !== offset,
+                newValue !== offset ? newValue : null,
+              ];
+            }
+          }
+          break;
         default:
-          return false;
+          return [false, null];
       }
+      return [false, null];
     },
     [direction, children, offset],
   );
 
+  const childrenWithProps = useMemo(() => {
+    return Children.map(children, (child, index) => {
+      const childProps = {
+        _navigate: () => {
+          if (_navigate) {
+            _navigate();
+          }
+          setOffset(index);
+        },
+        _focused: index === offset,
+      };
+      if (child.type === FullPageSection) {
+        childProps._setPathInParent = path => {
+          setChildPaths(prevPaths => {
+            const childPaths = [...prevPaths];
+            childPaths[index] = path;
+            return childPaths;
+          });
+        };
+      }
+      return React.cloneElement(child, childProps);
+    });
+  }, [children, _navigate, offset]);
+
+  const getPathFromOffset = useCallback(
+    offsetVal => {
+      return children[offsetVal].type === Page
+        ? children[offsetVal].props.path
+        : childPaths[offsetVal];
+    },
+    [childPaths, children],
+  );
+
+  const updateParentPath = useCallback(
+    path => {
+      if (_setPathInParent) _setPathInParent(path);
+    },
+    [_setPathInParent],
+  );
+
+  const updateParentAndRoute = useCallback(
+    path => {
+      updateParentPath(path);
+      navigateTo(path);
+    },
+    [updateParentPath, navigateTo],
+  );
+
   const handleScrollAction = useCallback(
     (scrollDirection, event) => {
-      if (!isHandlingAnimation && willAnimate(scrollDirection)) {
-        event.stopPropagation();
-        setHandlingAnimation(true);
-        dispatch({type: 'scroll', scrollDirection});
+      if (!isHandlingAnimation) {
+        const [willAnimate, newOffset] = willAnimateValue(scrollDirection);
+        if (willAnimate) {
+          event.stopPropagation();
+          setHandlingAnimation(true);
+          updateParentAndRoute(getPathFromOffset(newOffset));
+        }
       }
     },
-    [isHandlingAnimation, setHandlingAnimation, willAnimate],
+    [
+      isHandlingAnimation,
+      setHandlingAnimation,
+      willAnimateValue,
+      getPathFromOffset,
+      updateParentAndRoute,
+    ],
   );
 
   // TODO: this implementation of KeyListener will NOT work for complex nested FullPageSections, and thus should be deleted
@@ -86,19 +163,6 @@ const FullPageSection = ({direction, children, _navigate = null}) => {
   //   return () => window.removeEventListener('keydown', keyListener);
   // }, [handleScrollAction]);
 
-  const childrenWithNavigation = useMemo(() => {
-    return Children.map(children, (child, index) => {
-      return React.cloneElement(child, {
-        _navigate: () => {
-          if (_navigate) {
-            _navigate();
-          }
-          dispatch({type: 'navigate', offset: index});
-        },
-      });
-    })
-  }, [children, _navigate]);
-
   return (
     <div className={classes.FullPageContainer}>
       <div
@@ -111,7 +175,7 @@ const FullPageSection = ({direction, children, _navigate = null}) => {
           setHandlingAnimation(false);
         }}
       >
-        {childrenWithNavigation}
+        {childrenWithProps}
       </div>
     </div>
   );
