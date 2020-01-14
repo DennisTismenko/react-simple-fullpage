@@ -21,3 +21,5 @@ export const getScrollDirection = e => {
 export const getArrowDirection = e => {
   return keyDirections[e.key];
 }
+
+export const parseHashValue = hash => hash.substring(1);
