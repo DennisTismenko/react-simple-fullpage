@@ -5,3 +5,27 @@
   align-items: center;
   justify-content: center;
 }
+
+.bg-aqua {
+  background-color: aqua;
+}
+
+.bg-beige {
+  background-color: beige;
+}
+
+.bg-crimson {
+  background-color: crimson;
+}
+
+.bg-green {
+  background-color: green;
+}
+
+.bg-blue {
+  background-color: blue;
+}
+
+.bg-yellow {
+  background-color: yellow;
+}
