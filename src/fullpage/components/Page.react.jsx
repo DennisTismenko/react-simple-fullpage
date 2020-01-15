@@ -16,4 +16,4 @@ const Page = ({path, _navigate, children}) => {
   );
 };
 
-export default Page;
+export default React.memo(Page);

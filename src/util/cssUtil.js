@@ -12,6 +12,12 @@ export const getCssTranslationStr = (direction, offset) => {
   }
 };
 
+export const getCssTranslationPxStr = (direction, offset, dragOffset) => {
+  return direction === 'horizontal'
+    ? `translateX(${window.innerWidth * -offset + dragOffset.x}px)`
+    : `translateY(${window.innerHeight * -offset + dragOffset.y}px)`;
+};
+
 export const getFlexDirection = direction => {
   return flexDirections[direction];
 };

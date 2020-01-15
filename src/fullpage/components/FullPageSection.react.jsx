@@ -6,11 +6,21 @@ import React, {
   useEffect,
 } from 'react';
 import classes from './FullPageSection.module.css';
-import {getScrollDirection} from '../../util/navUtil';
+import {getScrollDirection, getRelativeTouchScrollDirection} from '../../util/navUtil';
 import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
-import {getCssTranslationStr, getFlexDirection} from '../../util/cssUtil';
+import {
+  getCssTranslationStr,
+  getFlexDirection,
+  getCssTranslationPxStr,
+} from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
 import Page from './Page.react';
+
+const initialCoordinates = {x: 0, y: 0};
+
+const isDragging = dragOffset => {
+  return dragOffset.x !== 0 || dragOffset.y !== 0;
+};
 
 const FullPageSection = ({
   direction,
@@ -25,21 +35,27 @@ const FullPageSection = ({
   } = useFullPageContext();
   const [offset, setOffset] = useState(0);
   const [childPaths, setChildPaths] = useState([]);
+  const [startCoordinates, setStartCoordinates] = useState(initialCoordinates);
+  const [dragOffset, setDragOffset] = useState(initialCoordinates);
+
+  const getPathFromOffset = useCallback(
+    offsetVal => {
+      return children[offsetVal].type === Page
+        ? children[offsetVal].props.path
+        : childPaths[offsetVal];
+    },
+    [childPaths, children],
+  );
 
   useEffect(() => {
     if (_setPathInParent) {
-      const path =
-        children[offset].type === Page
-          ? children[offset].props.path
-          : childPaths[offset];
-      _setPathInParent(path);
+      _setPathInParent(getPathFromOffset(offset));
     }
-  }, [_setPathInParent, offset, children, childPaths]);
+  }, [_setPathInParent, offset, getPathFromOffset]);
 
-  const panelStyles = useMemo(() => {
+  const memoizedPanelStyles = useMemo(() => {
     const styles = {
       flexDirection: getFlexDirection(direction),
-      transform: getCssTranslationStr(direction, offset),
     };
     if (direction === 'vertical') {
       styles.height = `${100 * Children.count(children)}vh`;
@@ -47,7 +63,14 @@ const FullPageSection = ({
       styles.width = `${100 * Children.count(children)}vw`;
     }
     return styles;
-  }, [direction, children, offset]);
+  }, [direction, children]);
+
+  const panelStyles = {
+    ...memoizedPanelStyles,
+    transform: !isDragging(dragOffset)
+      ? getCssTranslationStr(direction, offset)
+      : getCssTranslationPxStr(direction, offset, dragOffset),
+  };
 
   const willAnimateValue = useCallback(
     scrollDirection => {
@@ -92,11 +115,13 @@ const FullPageSection = ({
           }
           setOffset(index);
         },
-        _focused: index === offset,
       };
       if (child.type === FullPageSection) {
         childProps._setPathInParent = path => {
           setChildPaths(prevPaths => {
+            if (prevPaths[index] === path) {
+              return prevPaths;
+            }
             const childPaths = [...prevPaths];
             childPaths[index] = path;
             return childPaths;
@@ -105,31 +130,7 @@ const FullPageSection = ({
       }
       return React.cloneElement(child, childProps);
     });
-  }, [children, _navigate, offset]);
-
-  const getPathFromOffset = useCallback(
-    offsetVal => {
-      return children[offsetVal].type === Page
-        ? children[offsetVal].props.path
-        : childPaths[offsetVal];
-    },
-    [childPaths, children],
-  );
-
-  const updateParentPath = useCallback(
-    path => {
-      if (_setPathInParent) _setPathInParent(path);
-    },
-    [_setPathInParent],
-  );
-
-  const updateParentAndRoute = useCallback(
-    path => {
-      updateParentPath(path);
-      navigateTo(path);
-    },
-    [updateParentPath, navigateTo],
-  );
+  }, [children, _navigate]);
 
   const handleScrollAction = useCallback(
     (scrollDirection, event) => {
@@ -138,7 +139,7 @@ const FullPageSection = ({
         if (willAnimate) {
           event.stopPropagation();
           setHandlingAnimation(true);
-          updateParentAndRoute(getPathFromOffset(newOffset));
+          navigateTo(getPathFromOffset(newOffset));
         }
       }
     },
@@ -147,32 +148,49 @@ const FullPageSection = ({
       setHandlingAnimation,
       willAnimateValue,
       getPathFromOffset,
-      updateParentAndRoute,
+      navigateTo,
     ],
   );
-
-  // TODO: this implementation of KeyListener will NOT work for complex nested FullPageSections, and thus should be deleted
-  // useEffect(() => {
-  //   const keyListener = e => {
-  //     const arrowDirection = getArrowDirection(e);
-  //     if (arrowDirection) {
-  //       handleScrollAction(arrowDirection, e);
-  //     }
-  //   };
-  //   window.addEventListener('keydown', keyListener);
-  //   return () => window.removeEventListener('keydown', keyListener);
-  // }, [handleScrollAction]);
-
   return (
     <div className={classes.FullPageContainer}>
       <div
-        className={classes.FullPageSection}
+        className={[classes.FullPageSection, isHandlingAnimation && classes.Transition].join(' ')}
         style={panelStyles}
         onWheel={e => {
           handleScrollAction(getScrollDirection(e), e);
         }}
         onTransitionEnd={() => {
           setHandlingAnimation(false);
+        }}
+        onTouchStart={e => {
+          const {screenX, screenY} = e.changedTouches[0];
+          console.log(screenX, screenY);
+          setStartCoordinates({x: screenX, y: screenY});
+        }}
+        onTouchMove={e => {
+          e.stopPropagation();
+          const {screenX, screenY} = e.changedTouches[0];
+          setDragOffset({
+            x: screenX - startCoordinates.x,
+            y: screenY - startCoordinates.y,
+          });
+        }}
+        onTouchEnd={e => {
+          const {screenX, screenY} = e.changedTouches[0];
+          const endCoordinates = {x: screenX, y: screenY};
+          console.log(screenX, screenY);
+          const scrollDirection = getRelativeTouchScrollDirection(
+            startCoordinates,
+            endCoordinates,
+            direction
+          );
+          console.log(scrollDirection);
+          if (scrollDirection) {
+            setDragOffset(initialCoordinates);
+            handleScrollAction(scrollDirection, e);
+          } else {
+            setDragOffset(initialCoordinates);
+          }
         }}
       >
         {childrenWithProps}
