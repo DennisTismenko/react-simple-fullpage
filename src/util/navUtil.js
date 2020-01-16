@@ -18,6 +18,23 @@ export const getScrollDirection = e => {
   }
 };
 
+export const getNavigableDirections = (
+  direction,
+  offset,
+  lowerBound,
+  upperBound,
+) => {
+  const navigableirections = [];
+  if (offset > lowerBound) {
+    navigableirections.push(direction === 'horizontal' ? 'left' : 'up');
+  }
+  if (offset < upperBound) {
+    navigableirections.push(direction === 'horizontal' ? 'right' : 'down');
+  }
+
+  return navigableirections;
+};
+
 export const getArrowDirection = e => {
   return keyDirections[e.key];
 };
@@ -43,13 +60,54 @@ export const getTouchScrollDirection = (
   return null;
 };
 
-export const getRelativeTouchScrollDirection = (startCoordinates, endCoordinates, direction, threshold=50) => {
-  const scrollDirection = getTouchScrollDirection(startCoordinates, endCoordinates, threshold);
+export const getRelativeTouchScrollDirection = (
+  startCoordinates,
+  endCoordinates,
+  direction,
+  threshold = direction === 'vertical'
+    ? window.innerHeight / 6
+    : window.innerWidth / 6,
+) => {
+  const scrollDirection = getTouchScrollDirection(
+    startCoordinates,
+    endCoordinates,
+    threshold,
+  );
   switch (direction) {
-    case 'vertical': return scrollDirection === 'up' || scrollDirection === 'down' ? scrollDirection : null;
-    case 'horizontal': return scrollDirection === 'left' || scrollDirection === 'right' ? scrollDirection : null;
-    default: return null;
+    case 'vertical':
+      return scrollDirection === 'up' || scrollDirection === 'down'
+        ? scrollDirection
+        : null;
+    case 'horizontal':
+      return scrollDirection === 'left' || scrollDirection === 'right'
+        ? scrollDirection
+        : null;
+    default:
+      return null;
   }
-}
+};
+
+export const getAllowableOffsetValues = (
+  direction,
+  navigableDirections,
+  deltaOffset,
+) => {
+  let {x, y} = deltaOffset;
+  if (
+    direction === 'vertical' &&
+    ((!navigableDirections.includes('up') && y > 0) ||
+      (!navigableDirections.includes('down') && y < 0))
+  ) {
+    y = 0;
+  } else if (
+    direction === 'horizontal' &&
+    ((!navigableDirections.includes('left') && x > 0) ||
+      (!navigableDirections.includes('right') && x < 0))
+  ) {
+    x = 0;
+  }
+  console.log({x,y})
+  return {x, y};
+};
 
 export const parseHashValue = hash => hash.substring(1);

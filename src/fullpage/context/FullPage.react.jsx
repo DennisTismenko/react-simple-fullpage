@@ -5,6 +5,7 @@ const FullPageContext = React.createContext(null);
 
 export const FullPage = ({children}) => {
   const [isHandlingAnimation, setHandlingAnimation] = useState(false);
+  const [isHandlingDrag, setHandlingDrag] = useState(false);
   const [currentPath, setCurrentPath] = useState(null);
 
   const navigateTo = path => {
@@ -41,6 +42,8 @@ export const FullPage = ({children}) => {
       value={{
         isHandlingAnimation,
         setHandlingAnimation,
+        isHandlingDrag,
+        setHandlingDrag,
         currentPath,
         navigateTo,
       }}

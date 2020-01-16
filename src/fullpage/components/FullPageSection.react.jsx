@@ -4,9 +4,16 @@ import React, {
   useMemo,
   useState,
   useEffect,
+  useReducer,
 } from 'react';
 import classes from './FullPageSection.module.css';
-import {getScrollDirection, getRelativeTouchScrollDirection} from '../../util/navUtil';
+import {
+  getScrollDirection,
+  getRelativeTouchScrollDirection,
+  getTouchScrollDirection,
+  getNavigableDirections,
+  getAllowableOffsetValues,
+} from '../../util/navUtil';
 import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
 import {
   getCssTranslationStr,
@@ -17,9 +24,24 @@ import {useFullPageContext} from '../context/FullPage.react';
 import Page from './Page.react';
 
 const initialCoordinates = {x: 0, y: 0};
+const initialDragState = {direction: null, offset: initialCoordinates};
 
-const isDragging = dragOffset => {
-  return dragOffset.x !== 0 || dragOffset.y !== 0;
+// const isDragging = dragOffset => {
+//   return dragOffset.x !== 0 || dragOffset.y !== 0;
+// };
+
+const reducer = (state, action) => {
+  switch (action.type) {
+    case 'setOffset':
+      const {x, y} = action;
+      return {...state, offset: {x, y}};
+    case 'setDirection':
+      return {...state, direction: action.direction};
+    case 'reset':
+      return initialDragState;
+    default:
+      return state;
+  }
 };
 
 const FullPageSection = ({
@@ -31,13 +53,25 @@ const FullPageSection = ({
   const {
     isHandlingAnimation,
     setHandlingAnimation,
+    isHandlingDrag,
+    setHandlingDrag,
     navigateTo,
   } = useFullPageContext();
   const [offset, setOffset] = useState(0);
   const [childPaths, setChildPaths] = useState([]);
   const [startCoordinates, setStartCoordinates] = useState(initialCoordinates);
-  const [dragOffset, setDragOffset] = useState(initialCoordinates);
+  const [dragState, dispatch] = useReducer(reducer, initialDragState);
 
+  const navigableDirections = useMemo(
+    () =>
+      getNavigableDirections(
+        direction,
+        offset,
+        0,
+        Children.count(children) - 1,
+      ),
+    [children, direction, offset],
+  );
   const getPathFromOffset = useCallback(
     offsetVal => {
       return children[offsetVal].type === Page
@@ -45,6 +79,16 @@ const FullPageSection = ({
         : childPaths[offsetVal];
     },
     [childPaths, children],
+  );
+
+  const setDragOffset = useCallback(
+    offset => {
+      dispatch({
+        ...getAllowableOffsetValues(direction, navigableDirections, offset),
+        type: 'setOffset',
+      });
+    },
+    [direction, navigableDirections],
   );
 
   useEffect(() => {
@@ -67,10 +111,12 @@ const FullPageSection = ({
 
   const panelStyles = {
     ...memoizedPanelStyles,
-    transform: !isDragging(dragOffset)
+    transform: !isHandlingDrag
       ? getCssTranslationStr(direction, offset)
-      : getCssTranslationPxStr(direction, offset, dragOffset),
+      : getCssTranslationPxStr(direction, offset, dragState.offset),
   };
+
+  // console.log(panelStyles.transform);
 
   const willAnimateValue = useCallback(
     scrollDirection => {
@@ -154,7 +200,10 @@ const FullPageSection = ({
   return (
     <div className={classes.FullPageContainer}>
       <div
-        className={[classes.FullPageSection, isHandlingAnimation && classes.Transition].join(' ')}
+        className={[
+          classes.FullPageSection,
+          isHandlingAnimation && classes.Transition,
+        ].join(' ')}
         style={panelStyles}
         onWheel={e => {
           handleScrollAction(getScrollDirection(e), e);
@@ -163,34 +212,53 @@ const FullPageSection = ({
           setHandlingAnimation(false);
         }}
         onTouchStart={e => {
-          const {screenX, screenY} = e.changedTouches[0];
-          console.log(screenX, screenY);
-          setStartCoordinates({x: screenX, y: screenY});
+          if (!isHandlingDrag) {
+            const {screenX, screenY} = e.changedTouches[0];
+            setStartCoordinates({x: screenX, y: screenY});
+          }
         }}
         onTouchMove={e => {
-          e.stopPropagation();
           const {screenX, screenY} = e.changedTouches[0];
-          setDragOffset({
-            x: screenX - startCoordinates.x,
-            y: screenY - startCoordinates.y,
-          });
+          if (!isHandlingDrag) {
+            const direction = getTouchScrollDirection(
+              startCoordinates,
+              {
+                x: screenX,
+                y: screenY,
+              },
+              0,
+            );
+            if (navigableDirections.includes(direction)) {
+              e.stopPropagation();
+              setHandlingDrag(true);
+              dispatch({type: 'setDirection', direction});
+              setDragOffset({
+                x: screenX - startCoordinates.x,
+                y: screenY - startCoordinates.y,
+              });
+            }
+          } else {
+            if (dragState.direction) {
+              setDragOffset({
+                x: screenX - startCoordinates.x,
+                y: screenY - startCoordinates.y,
+              });
+            }
+          }
         }}
         onTouchEnd={e => {
           const {screenX, screenY} = e.changedTouches[0];
           const endCoordinates = {x: screenX, y: screenY};
-          console.log(screenX, screenY);
           const scrollDirection = getRelativeTouchScrollDirection(
             startCoordinates,
             endCoordinates,
-            direction
+            direction,
           );
-          console.log(scrollDirection);
+          dispatch({type: 'reset'});
           if (scrollDirection) {
-            setDragOffset(initialCoordinates);
             handleScrollAction(scrollDirection, e);
-          } else {
-            setDragOffset(initialCoordinates);
           }
+          setHandlingDrag(false);
         }}
       >
         {childrenWithProps}
