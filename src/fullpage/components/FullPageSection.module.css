@@ -10,6 +10,6 @@
 }
 
 .Transition {
-  -webkit-transition: transform 0.3s ease-out 0s;
-  transition: transform 0.3s ease-out 0s;
+  -webkit-transition: transform 0.8s ease-in-out 0s;
+  transition: transform 0.8s ease-in-out 0s;
 }

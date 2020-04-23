@@ -106,7 +106,6 @@ export const getAllowableOffsetValues = (
   ) {
     x = 0;
   }
-  console.log({x,y})
   return {x, y};
 };
 
