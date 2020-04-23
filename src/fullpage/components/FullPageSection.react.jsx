@@ -159,6 +159,7 @@ const FullPageSection = ({
           if (_navigate) {
             _navigate();
           }
+          setHandlingAnimation(true);
           setOffset(index);
         },
       };
@@ -176,7 +177,7 @@ const FullPageSection = ({
       }
       return React.cloneElement(child, childProps);
     });
-  }, [children, _navigate]);
+  }, [children, _navigate, setHandlingAnimation]);
 
   const handleScrollAction = useCallback(
     (scrollDirection, event) => {
