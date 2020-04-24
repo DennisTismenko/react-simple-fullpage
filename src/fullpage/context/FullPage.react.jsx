@@ -27,6 +27,7 @@ export const FullPage = ({children}) => {
     };
     const handleHashChange = e => {
       e.preventDefault();
+      setHandlingAnimation(true);
       routeToHash();
     };
     window.addEventListener('hashchange', handleHashChange);

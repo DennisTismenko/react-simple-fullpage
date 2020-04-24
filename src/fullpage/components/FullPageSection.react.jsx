@@ -153,13 +153,13 @@ const FullPageSection = ({
   );
 
   const childrenWithProps = useMemo(() => {
+    console.log('Creating children');
     return Children.map(children, (child, index) => {
       const childProps = {
         _navigate: () => {
           if (_navigate) {
             _navigate();
           }
-          setHandlingAnimation(true);
           setOffset(index);
         },
       };
@@ -177,7 +177,7 @@ const FullPageSection = ({
       }
       return React.cloneElement(child, childProps);
     });
-  }, [children, _navigate, setHandlingAnimation]);
+  }, [children, _navigate]);
 
   const handleScrollAction = useCallback(
     (scrollDirection, event) => {
@@ -213,14 +213,14 @@ const FullPageSection = ({
           setHandlingAnimation(false);
         }}
         onTouchStart={e => {
-          if (!isHandlingDrag) {
+          if (!isHandlingDrag && !isHandlingAnimation) {
             const {screenX, screenY} = e.changedTouches[0];
             setStartCoordinates({x: screenX, y: screenY});
           }
         }}
         onTouchMove={e => {
           const {screenX, screenY} = e.changedTouches[0];
-          if (!isHandlingDrag) {
+          if (!isHandlingDrag && !isHandlingAnimation) {
             const direction = getTouchScrollDirection(
               startCoordinates,
               {
