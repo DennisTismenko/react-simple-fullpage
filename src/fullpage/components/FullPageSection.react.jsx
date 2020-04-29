@@ -3,25 +3,21 @@ import React, {
   useCallback,
   useMemo,
   useState,
-  useEffect,
   useReducer,
 } from 'react';
 import classes from './FullPageSection.module.css';
 import {
-  getScrollDirection,
   getRelativeTouchScrollDirection,
   getTouchScrollDirection,
   getNavigableDirections,
   getAllowableOffsetValues,
 } from '../../util/navUtil';
-import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
 import {
   getCssTranslationStr,
   getFlexDirection,
   getCssTranslationPxStr,
 } from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
-import Page from './Page.react';
 
 const initialCoordinates = {x: 0, y: 0};
 const initialDragState = {direction: null, offset: initialCoordinates};
@@ -47,18 +43,14 @@ const reducer = (state, action) => {
 const FullPageSection = ({
   direction,
   children,
-  _navigate = null,
-  _setPathInParent = null,
+  offset,
 }) => {
   const {
     isHandlingAnimation,
     setHandlingAnimation,
     isHandlingDrag,
     setHandlingDrag,
-    navigateTo,
   } = useFullPageContext();
-  const [offset, setOffset] = useState(0);
-  const [childPaths, setChildPaths] = useState([]);
   const [startCoordinates, setStartCoordinates] = useState(initialCoordinates);
   const [dragState, dispatch] = useReducer(reducer, initialDragState);
 
@@ -72,14 +64,6 @@ const FullPageSection = ({
       ),
     [children, direction, offset],
   );
-  const getPathFromOffset = useCallback(
-    offsetVal => {
-      return children[offsetVal].type === Page
-        ? children[offsetVal].props.path
-        : childPaths[offsetVal];
-    },
-    [childPaths, children],
-  );
 
   const setDragOffset = useCallback(
     offset => {
@@ -90,12 +74,6 @@ const FullPageSection = ({
     },
     [direction, navigableDirections],
   );
-
-  useEffect(() => {
-    if (_setPathInParent) {
-      _setPathInParent(getPathFromOffset(offset));
-    }
-  }, [_setPathInParent, offset, getPathFromOffset]);
 
   const memoizedPanelStyles = useMemo(() => {
     const styles = {
@@ -118,86 +96,7 @@ const FullPageSection = ({
 
   // console.log(panelStyles.transform);
 
-  const willAnimateValue = useCallback(
-    scrollDirection => {
-      switch (direction) {
-        case 'vertical':
-          if (scrollDirection === 'up' || scrollDirection === 'down') {
-            const newValue =
-              scrollDirection === 'up'
-                ? decrementIfGte(offset, 0)
-                : incrementIfLte(offset, Children.count(children) - 1);
-            return [newValue !== offset, newValue !== offset ? newValue : null];
-          }
-          break;
-        case 'horizontal':
-          if (scrollDirection === 'left' || scrollDirection === 'right') {
-            if (scrollDirection === 'left' || scrollDirection === 'right') {
-              const newValue =
-                scrollDirection === 'left'
-                  ? decrementIfGte(offset, 0)
-                  : incrementIfLte(offset, Children.count(children) - 1);
-              return [
-                newValue !== offset,
-                newValue !== offset ? newValue : null,
-              ];
-            }
-          }
-          break;
-        default:
-          return [false, null];
-      }
-      return [false, null];
-    },
-    [direction, children, offset],
-  );
 
-  const childrenWithProps = useMemo(() => {
-    console.log('Creating children');
-    return Children.map(children, (child, index) => {
-      const childProps = {
-        _navigate: () => {
-          if (_navigate) {
-            _navigate();
-          }
-          setOffset(index);
-        },
-      };
-      if (child.type === FullPageSection) {
-        childProps._setPathInParent = path => {
-          setChildPaths(prevPaths => {
-            if (prevPaths[index] === path) {
-              return prevPaths;
-            }
-            const childPaths = [...prevPaths];
-            childPaths[index] = path;
-            return childPaths;
-          });
-        };
-      }
-      return React.cloneElement(child, childProps);
-    });
-  }, [children, _navigate]);
-
-  const handleScrollAction = useCallback(
-    (scrollDirection, event) => {
-      if (!isHandlingAnimation) {
-        const [willAnimate, newOffset] = willAnimateValue(scrollDirection);
-        if (willAnimate) {
-          event.stopPropagation();
-          setHandlingAnimation(true);
-          navigateTo(getPathFromOffset(newOffset));
-        }
-      }
-    },
-    [
-      isHandlingAnimation,
-      setHandlingAnimation,
-      willAnimateValue,
-      getPathFromOffset,
-      navigateTo,
-    ],
-  );
   return (
     <div className={classes.FullPageContainer}>
       <div
@@ -206,9 +105,6 @@ const FullPageSection = ({
           isHandlingAnimation && classes.Transition,
         ].join(' ')}
         style={panelStyles}
-        onWheel={e => {
-          handleScrollAction(getScrollDirection(e), e);
-        }}
         onTransitionEnd={() => {
           setHandlingAnimation(false);
         }}
@@ -257,12 +153,13 @@ const FullPageSection = ({
           );
           dispatch({type: 'reset'});
           if (scrollDirection) {
-            handleScrollAction(scrollDirection, e);
+            // handleScrollAction(scrollDirection, e);
           }
           setHandlingDrag(false);
         }}
       >
-        {childrenWithProps}
+        {/* {childrenWithProps} */}
+        {children}
       </div>
     </div>
   );

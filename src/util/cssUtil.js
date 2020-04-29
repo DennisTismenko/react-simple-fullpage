@@ -21,3 +21,4 @@ export const getCssTranslationPxStr = (direction, offset, dragOffset) => {
 export const getFlexDirection = direction => {
   return flexDirections[direction];
 };
+
