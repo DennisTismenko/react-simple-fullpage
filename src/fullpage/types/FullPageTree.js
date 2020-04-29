@@ -41,9 +41,12 @@ export const createDOMComponents = (root) => {
 
 const _createDOMComponents = (root) => {
   if (root instanceof PageNode) {
-    return root.component;
+    return cloneElement(root.component, {key: root.path});
   } else {
     return cloneElement(root.component, {
+      key: root.children
+        .map((child) => (child.path ? child.path : 'section'))
+        .join('_'),
       offset: root._index,
       children: root.children.map((child) => _createDOMComponents(child)),
     });
@@ -88,19 +91,23 @@ export const navigateAction = (pageTree, direction, onSuccess) => {
     throw new Error(`Direction '${direction}' not recognized.`);
   }
   let section = focused.parent;
-  while (section && section.orientation !== targetOrientation) {
-    section = section.parent;
+  let canNavigate = false;
+  let targetIndex;
+
+  while (section && !canNavigate) {
+    if (section.orientation === targetOrientation) {
+      targetIndex = getTargetIndex(section, direction);
+      if (targetIndex !== null) {
+        canNavigate = true;
+      } else {
+        section = section.parent;
+      }
+    } else {
+      section = section.parent;
+    }
   }
   if (section) {
-    let targetIndex;
-    if (direction === 'up' || direction === 'left') {
-      targetIndex = prevChildIndex(section);
-    } else if (direction === 'down' || direction === 'right') {
-      targetIndex = nextChildIndex(section);
-    } else {
-      throw new Error(`Direction '${direction}' not recognized.`);
-    }
-
+    targetIndex = getTargetIndex(section, direction);
     if (targetIndex !== null) {
       section._index = targetIndex;
       onSuccess(new FullPageTree(pageTree.root));
@@ -108,15 +115,17 @@ export const navigateAction = (pageTree, direction, onSuccess) => {
   }
 };
 
-// get focusedChild() {
-//   return this.children[this._index];
-// }
-
-// get prevChild() {
-//   const prevIndex = this._prevChildIndex;
-//   if (!prevIndex) return undefined;
-//   return this.children[prevIndex];
-// }
+const getTargetIndex = (section, direction) => {
+  let targetIndex;
+  if (direction === 'up' || direction === 'left') {
+    targetIndex = prevChildIndex(section);
+  } else if (direction === 'down' || direction === 'right') {
+    targetIndex = nextChildIndex(section);
+  } else {
+    throw new Error(`Direction '${direction}' not recognized.`);
+  }
+  return targetIndex;
+};
 
 const nextChildIndex = (section) => {
   return section.options.loop
@@ -133,27 +142,3 @@ const prevChildIndex = (section) => {
     ? section._index - 1
     : null;
 };
-
-// get offset() {
-//   return this._index;
-// }
-
-// focusNextChild() {
-//   const nextIndex = this._nextChildIndex;
-//   if (!nextIndex) {
-//     console.warn('Next child does not exist.');
-//   } else {
-//     this._index = nextIndex;
-//   }
-//   return this.focusedChild;
-// }
-
-// focusPrevChild() {
-//   const prevIndex = this._prevChildIndex;
-//   if (!prevIndex) {
-//     console.warn('Previous child does not exist.');
-//   } else {
-//     this._index = prevIndex;
-//   }
-//   return this.focusedChild;
-// }

@@ -1,7 +1,7 @@
 import React, {
   useState,
   useContext,
-  // useEffect,
+  useEffect,
   useMemo,
   useCallback,
 } from 'react';
@@ -10,7 +10,7 @@ import {
   createDOMComponents,
   navigateAction,
 } from '../types/FullPageTree';
-import {getScrollDirection} from '../../util/navUtil';
+import {getScrollDirection, getArrowDirection} from '../../util/navUtil';
 
 const FullPageContext = React.createContext(null);
 
@@ -26,76 +26,44 @@ export const FullPage = ({children}) => {
 
   // Debug
   // useEffect(() => {
-  //   console.debug(pageTree);
-  //   console.debug(pageTreeDOMComponents);
+  // console.debug(pageTree);
+  // console.debug(pageTreeDOMComponents);
   // }, [pageTree, pageTreeDOMComponents]);
-
-  // const willAnimateValue = useCallback(
-  //   scrollDirection => {
-  //     switch (direction) {
-  //       case 'vertical':
-  //         if (scrollDirection === 'up' || scrollDirection === 'down') {
-  //           const newValue =
-  //             scrollDirection === 'up'
-  //               ? decrementIfGte(offset, 0)
-  //               : incrementIfLte(offset, Children.count(children) - 1);
-  //           return [newValue !== offset, newValue !== offset ? newValue : null];
-  //         }
-  //         break;
-  //       case 'horizontal':
-  //         if (scrollDirection === 'left' || scrollDirection === 'right') {
-  //           if (scrollDirection === 'left' || scrollDirection === 'right') {
-  //             const newValue =
-  //               scrollDirection === 'left'
-  //                 ? decrementIfGte(offset, 0)
-  //                 : incrementIfLte(offset, Children.count(children) - 1);
-  //             return [
-  //               newValue !== offset,
-  //               newValue !== offset ? newValue : null,
-  //             ];
-  //           }
-  //         }
-  //         break;
-  //       default:
-  //         return [false, null];
-  //     }
-  //     return [false, null];
-  //   },
-  //   [direction, children, offset],
-  // );
-
-  // const handleScrollAction = useCallback(
-  //   (scrollDirection, event) => {
-  //     if (!isHandlingAnimation) {
-  //       const [willAnimate, newOffset] = willAnimateValue(scrollDirection);
-  //       if (willAnimate) {
-  //         event.stopPropagation();
-  //         setHandlingAnimation(true);
-  //         // navigateTo(getPathFromOffset(newOffset));
-  //       }
-  //     }
-  //   },
-  //   [
-  //     isHandlingAnimation,
-  //     setHandlingAnimation,
-  //     willAnimateValue,
-  //     // getPathFromOffset,
-  //   ],
-  // );
 
   const handleTreeUpdate = useCallback((updatedPageTree) => {
     setHandlingAnimation(true);
     setPageTree(updatedPageTree);
   }, []);
 
-  const handleScrollAction = (e) => {
+  const handleAction = useCallback((e, actionType) => {
     if (!isHandlingAnimation) {
-      navigateAction(pageTree, getScrollDirection(e), handleTreeUpdate);
+      let direction;
+      switch (actionType) {
+        case 'scroll':
+          direction = getScrollDirection(e);
+          break;
+        case 'key':
+          direction = getArrowDirection(e);
+          break;
+        default:
+          return;
+      }
+      if (!direction) return;
+      navigateAction(pageTree, direction, handleTreeUpdate);
     }
-  };
+  }, [handleTreeUpdate, isHandlingAnimation, pageTree]);
+
+  useEffect(() => {
+    const handleKeyboardAction = (e) => handleAction(e, 'key');
+    window.addEventListener('keydown', handleKeyboardAction);
+    return () => {
+      window.removeEventListener('keydown', handleKeyboardAction);
+    };
+  }, [handleAction]);
+
 
   return (
-    <div onWheel={handleScrollAction}>
+    <div onWheel={(e) => handleAction(e, 'scroll')}>
       <FullPageContext.Provider
         value={{
           isHandlingAnimation,
