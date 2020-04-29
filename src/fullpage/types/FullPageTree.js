@@ -77,35 +77,36 @@ const getFocused = (root) => {
   return focused;
 };
 
-export const downAction = (pageTree, onAction) => {
+export const navigateAction = (pageTree, direction, onSuccess) => {
   const {focused} = pageTree;
+  let targetOrientation;
+  if (direction === 'up' || direction === 'down') {
+    targetOrientation = 'vertical';
+  } else if (direction === 'left' || direction === 'right') {
+    targetOrientation = 'horizontal';
+  } else {
+    throw new Error(`Direction '${direction}' not recognized.`);
+  }
   let section = focused.parent;
-  while(section && section.orientation !== 'vertical') {
+  while (section && section.orientation !== targetOrientation) {
     section = section.parent;
   }
   if (section) {
-    const next = nextChildIndex(section);
-    if (next !== null) {
-      section._index = next;
-      onAction(new FullPageTree(pageTree.root));
+    let targetIndex;
+    if (direction === 'up' || direction === 'left') {
+      targetIndex = prevChildIndex(section);
+    } else if (direction === 'down' || direction === 'right') {
+      targetIndex = nextChildIndex(section);
+    } else {
+      throw new Error(`Direction '${direction}' not recognized.`);
     }
-  }
-}
 
-export const upAction = (pageTree, onAction) => {
-  const {focused} = pageTree;
-  let section = focused.parent;
-  while(section && section.orientation !== 'vertical') {
-    section = section.parent;
-  }
-  if (section) {
-    const prev = prevChildIndex(section);
-    if (prev !== null) {
-      section._index = prev;
-      onAction(new FullPageTree(pageTree.root));
+    if (targetIndex !== null) {
+      section._index = targetIndex;
+      onSuccess(new FullPageTree(pageTree.root));
     }
   }
-}
+};
 
 // get focusedChild() {
 //   return this.children[this._index];
@@ -123,7 +124,7 @@ const nextChildIndex = (section) => {
     : section._index + 1 < section.children.length
     ? section._index + 1
     : null;
-}
+};
 
 const prevChildIndex = (section) => {
   return section.options.loop
@@ -131,7 +132,7 @@ const prevChildIndex = (section) => {
     : section._index - 1 >= 0
     ? section._index - 1
     : null;
-}
+};
 
 // get offset() {
 //   return this._index;

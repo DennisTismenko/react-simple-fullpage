@@ -8,8 +8,7 @@ import React, {
 import {
   constructFromDOM,
   createDOMComponents,
-  downAction,
-  upAction,
+  navigateAction,
 } from '../types/FullPageTree';
 import {getScrollDirection} from '../../util/navUtil';
 
@@ -91,21 +90,7 @@ export const FullPage = ({children}) => {
 
   const handleScrollAction = (e) => {
     if (!isHandlingAnimation) {
-      const scrollDirection = getScrollDirection(e);
-      switch (scrollDirection) {
-        case 'down':
-          return downAction(pageTree, handleTreeUpdate);
-        case 'up':
-          return upAction(pageTree, handleTreeUpdate);
-        case 'right':
-          console.log('right');
-          break;
-        case 'left':
-          console.log('left');
-          break;
-        default:
-          return;
-      }
+      navigateAction(pageTree, getScrollDirection(e), handleTreeUpdate);
     }
   };
 
