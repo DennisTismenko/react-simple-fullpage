@@ -3,6 +3,7 @@ import Page from '../components/Page.react';
 import FullPageSection from '../components/FullPageSection.react';
 import PageNode from './PageNode';
 import PageSectionNode from './PageSectionNode';
+import update from 'immutability-helper';
 
 export default class FullPageTree {
   constructor(root) {
@@ -106,13 +107,32 @@ export const navigateAction = (pageTree, direction, onSuccess) => {
       section = section.parent;
     }
   }
-  if (section) {
-    targetIndex = getTargetIndex(section, direction);
-    if (targetIndex !== null) {
-      section._index = targetIndex;
-      onSuccess(new FullPageTree(pageTree.root));
-    }
+  if (section && targetIndex !== null) {
+    onSuccess(
+      new FullPageTree(updatePageSection(pageTree.root, section, targetIndex)),
+    );
   }
+};
+
+const updatePageSection = (root, section, targetIndex) => {
+  let updatedNode;
+  if (root === section) {
+    updatedNode = update(root, {_index: {$set: targetIndex}});
+  } else {
+    updatedNode = update(root, {
+      children: {
+        $splice: [
+          [
+            root._index,
+            1,
+            updatePageSection(root.children[root._index], section, targetIndex),
+          ],
+        ],
+      },
+    });
+  }
+  updatedNode.children.forEach((child) => (child.parent = updatedNode));
+  return updatedNode;
 };
 
 const getTargetIndex = (section, direction) => {
