@@ -9,8 +9,13 @@ import {
   constructFromDOM,
   createDOMComponents,
   navigateAction,
+  navigateTo,
 } from '../types/FullPageTree';
-import {getScrollDirection, getArrowDirection} from '../../util/navUtil';
+import {
+  getScrollDirection,
+  getArrowDirection,
+  getHashValueFromURL,
+} from '../../util/navUtil';
 
 const FullPageContext = React.createContext(null);
 
@@ -35,23 +40,33 @@ export const FullPage = ({children}) => {
     setPageTree(updatedPageTree);
   }, []);
 
-  const handleAction = useCallback((e, actionType) => {
-    if (!isHandlingAnimation) {
-      let direction;
-      switch (actionType) {
-        case 'scroll':
-          direction = getScrollDirection(e);
-          break;
-        case 'key':
-          direction = getArrowDirection(e);
-          break;
-        default:
-          return;
+  const handleAction = useCallback(
+    (e, actionType) => {
+      if (!isHandlingAnimation) {
+        let direction;
+        switch (actionType) {
+          case 'scroll':
+            direction = getScrollDirection(e);
+            break;
+          case 'key':
+            direction = getArrowDirection(e);
+            break;
+          default:
+            return;
+        }
+        if (!direction) return;
+        navigateAction(pageTree, direction, handleTreeUpdate);
       }
-      if (!direction) return;
-      navigateAction(pageTree, direction, handleTreeUpdate);
-    }
-  }, [handleTreeUpdate, isHandlingAnimation, pageTree]);
+    },
+    [handleTreeUpdate, isHandlingAnimation, pageTree],
+  );
+
+  const handleNavigateTo = useCallback(
+    (path) => {
+      navigateTo(pageTree, pageTree.pathMap.get(path), handleTreeUpdate);
+    },
+    [pageTree, handleTreeUpdate],
+  );
 
   useEffect(() => {
     const handleKeyboardAction = (e) => handleAction(e, 'key');
@@ -61,6 +76,16 @@ export const FullPage = ({children}) => {
     };
   }, [handleAction]);
 
+  useEffect(() => {
+    const hashChangeHandler = (e) => {
+      console.log('hash changed!')
+      handleNavigateTo(getHashValueFromURL(e.newURL));
+    };
+    window.addEventListener('hashchange', hashChangeHandler);
+    return () => {
+      window.removeEventListener('hashchange', hashChangeHandler);
+    };
+  });
 
   return (
     <div onWheel={(e) => handleAction(e, 'scroll')}>

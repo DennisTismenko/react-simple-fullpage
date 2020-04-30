@@ -110,3 +110,4 @@ export const getAllowableOffsetValues = (
 };
 
 export const parseHashValue = hash => hash.substring(1);
+export const getHashValueFromURL = (URL) => URL.split('#')[1];

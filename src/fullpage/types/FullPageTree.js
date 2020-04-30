@@ -9,7 +9,7 @@ export default class FullPageTree {
   constructor(root) {
     this.root = root;
     this.focused = getFocused(this.root);
-    // this.offsetMap = getComponentOffsetMap(this.root);
+    this.pathMap = getPathMap(this.root);
   }
 }
 
@@ -52,6 +52,17 @@ const _createDOMComponents = (root) => {
       children: root.children.map((child) => _createDOMComponents(child)),
     });
   }
+};
+
+const getPathMap = (root, pathMap = new Map()) => {
+  root.children.forEach((child) => {
+    if (child instanceof PageNode) {
+      pathMap.set(child.path, child);
+    } else {
+      getPathMap(child, pathMap);
+    }
+  });
+  return pathMap;
 };
 
 export const getComponentOffsetMap = (root) => {
@@ -108,10 +119,20 @@ export const navigateAction = (pageTree, direction, onSuccess) => {
     }
   }
   if (section && targetIndex !== null) {
-    onSuccess(
-      new FullPageTree(updatePageSection(pageTree.root, section, targetIndex)),
-    );
+    onSuccess(updatePageTree(pageTree, section, targetIndex));
   }
+};
+
+const updatePageTree = (pageTree, section, targetIndex) => {
+  const updatedTreeRoot = updatePageSection(
+    pageTree.root,
+    section,
+    targetIndex,
+  );
+  return update(pageTree, {
+    root: {$set: updatedTreeRoot},
+    focused: {$set: getFocused(updatedTreeRoot)},
+  });
 };
 
 const updatePageSection = (root, section, targetIndex) => {
@@ -131,7 +152,7 @@ const updatePageSection = (root, section, targetIndex) => {
       },
     });
   }
-  updatedNode.children.forEach((child) => (child.parent = updatedNode));
+  updateChildParentReferences(updatedNode);
   return updatedNode;
 };
 
@@ -161,4 +182,47 @@ const prevChildIndex = (section) => {
     : section._index - 1 >= 0
     ? section._index - 1
     : null;
+};
+
+export const navigateTo = (pageTree, pageNode, onSuccess) => {
+  if (pageTree.focused === pageNode) {
+    return;
+  }
+  onSuccess(
+    update(pageTree, {
+      root: {$set: rebuildTreeUp(pageNode)},
+      focused: {$set: pageNode},
+    }),
+  );
+};
+
+const rebuildTreeUp = (pageNode) => {
+  let targetChild = pageNode;
+  let section = pageNode.parent;
+  let updatedChild = null;
+  while (section) {
+    let updateCommand = {};
+    let updatedSection;
+    const targetIndex = section.children.indexOf(targetChild);
+    if (updatedChild) {
+      updateCommand.children = {$splice: [[targetIndex, 1, updatedChild]]};
+    }
+    if (targetIndex !== section._index) {
+      updateCommand._index = {$set: targetIndex};
+    }
+
+    if (Object.keys(updateCommand).length > 0) {
+      updatedSection = update(section, updateCommand);
+      updateChildParentReferences(updatedSection);
+    }
+
+    targetChild = section;
+    updatedChild = updatedSection;
+    section = section.parent;
+  }
+  return updatedChild ? updatedChild : targetChild;
+};
+
+const updateChildParentReferences = (parent) => {
+  parent.children.forEach((child) => (child.parent = parent));
 };
