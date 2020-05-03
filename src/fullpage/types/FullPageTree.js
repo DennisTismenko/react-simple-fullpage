@@ -18,16 +18,17 @@ export const constructFromDOM = (root, offsets = new Map()) => {
 };
 
 const _constructFromDOM = (root, parent, offsets) => {
-  const {children, path, direction} = root.props;
+  const {children, path, orientation} = root.props;
   if (root.type === Page) {
     return new PageNode(root, path, parent);
   } else if (root.type === FullPageSection) {
     const sectionNode = new PageSectionNode(
       root,
-      direction,
+      orientation,
       offsets.has(root) ? offsets.get(root) : 0,
       [],
       parent,
+      {loop: root.props.loop ? true : false},
     );
     sectionNode.children = children.map((child) =>
       _constructFromDOM(child, sectionNode, offsets),
@@ -178,7 +179,7 @@ const nextChildIndex = (section) => {
 
 const prevChildIndex = (section) => {
   return section.options.loop
-    ? (section._index - 1) % section.children.length
+    ? (section._index - 1 + section.children.length) % section.children.length
     : section._index - 1 >= 0
     ? section._index - 1
     : null;
@@ -225,4 +226,41 @@ const rebuildTreeUp = (pageNode) => {
 
 const updateChildParentReferences = (parent) => {
   parent.children.forEach((child) => (child.parent = parent));
+};
+
+export const pageHasCollision = (pageNode, dragOrientation, direction) => {
+  const section = pageNode.parent;
+  return (
+    !canNavigate(section, dragOrientation, direction) &&
+    hasSameOrientationParent(section)
+  );
+};
+
+const canNavigate = (section, dragOrientation, direction) => {
+  if (dragOrientation !== section.orientation) return false;
+  if (section.orientation === 'vertical') {
+    if (direction === 'down') {
+      return section._index + 1 < section.children.length;
+    } else if (direction === 'up') {
+      return section._index - 1 >= 0;
+    }
+  } else if (section.orientation === 'horizontal') {
+    if (direction === 'right') {
+      return section._index + 1 < section.children.length;
+    } else if (direction === 'left') {
+      return section._index - 1 >= 0;
+    }
+  }
+  return false;
+};
+
+const hasSameOrientationParent = (section) => {
+  let current = section;
+  while (current.parent) {
+    if (current.parent.orientation === section.orientation) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 };

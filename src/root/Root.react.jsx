@@ -7,13 +7,13 @@ import classes from './Root.module.css';
 const Root = () => {
   return (
     <FullPage>
-      <FullPageSection direction="vertical">
+      <FullPageSection orientation="vertical">
         <Page path="aqua" color="aqua">
           <div className={[classes.Page, classes['bg-aqua']].join(' ')}>
             <h1>Aqua</h1>
           </div>
         </Page>
-        <FullPageSection direction="horizontal">
+        <FullPageSection orientation="horizontal">
           <Page path="beige" color="beige">
             <div className={[classes.Page, classes['bg-beige']].join(' ')}>
               <h1>Beige</h1>
@@ -24,7 +24,7 @@ const Root = () => {
               <h1>Crimson</h1>
             </div>
           </Page>
-          <FullPageSection direction="vertical">
+          <FullPageSection orientation="vertical">
             <Page path="green" color="green">
               <div className={[classes.Page, classes['bg-green']].join(' ')}>
                 <h1>Green</h1>

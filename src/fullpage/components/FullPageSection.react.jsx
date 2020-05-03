@@ -1,164 +1,151 @@
-import React, {
-  Children,
-  useCallback,
-  useMemo,
-  useState,
-  useReducer,
-} from 'react';
+import React, {Children, useMemo, useReducer} from 'react';
 import classes from './FullPageSection.module.css';
 import {
-  getRelativeTouchScrollDirection,
-  getTouchScrollDirection,
-  getNavigableDirections,
-  getAllowableOffsetValues,
-} from '../../util/navUtil';
-import {
-  getCssTranslationStr,
   getFlexDirection,
   getCssTranslationPxStr,
+  getCssTranslationStr,
 } from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
+import {
+  getTouchDragOrientation,
+} from '../../util/navUtil';
+import touchReducer from '../reducer/touchReducer';
+import {
+  startTouchAction,
+  moveTouchAction,
+  endTouchAction,
+} from '../actions/touchActions';
 
-const initialCoordinates = {x: 0, y: 0};
-const initialDragState = {direction: null, offset: initialCoordinates};
-
-// const isDragging = dragOffset => {
-//   return dragOffset.x !== 0 || dragOffset.y !== 0;
-// };
-
-const reducer = (state, action) => {
-  switch (action.type) {
-    case 'setOffset':
-      const {x, y} = action;
-      return {...state, offset: {x, y}};
-    case 'setDirection':
-      return {...state, direction: action.direction};
-    case 'reset':
-      return initialDragState;
-    default:
-      return state;
-  }
+const initialTouchState = {
+  startCoordinates: null,
+  touchCoordinates: null,
 };
 
-const FullPageSection = ({
-  direction,
-  children,
-  offset,
-}) => {
+const FullPageSection = ({orientation, loop, children, offset}) => {
   const {
     isHandlingAnimation,
     setHandlingAnimation,
     isHandlingDrag,
-    setHandlingDrag,
+    isHandlingDragAnimation,
+    onStartDrag,
+    onEndDrag,
+    onEndDragAnimation,
   } = useFullPageContext();
-  const [startCoordinates, setStartCoordinates] = useState(initialCoordinates);
-  const [dragState, dispatch] = useReducer(reducer, initialDragState);
-
-  const navigableDirections = useMemo(
-    () =>
-      getNavigableDirections(
-        direction,
-        offset,
-        0,
-        Children.count(children) - 1,
-      ),
-    [children, direction, offset],
+  const [{startCoordinates, touchCoordinates}, dispatch] = useReducer(
+    touchReducer,
+    initialTouchState,
   );
 
-  const setDragOffset = useCallback(
-    offset => {
-      dispatch({
-        ...getAllowableOffsetValues(direction, navigableDirections, offset),
-        type: 'setOffset',
-      });
-    },
-    [direction, navigableDirections],
-  );
+  // const canNavigateToDirection = useCallback(
+  //   (direction, targetOrientation, currentOffset) => {
+  //     if (targetOrientation !== orientation) return false;
+  //     const childCount = Children.count(children);
+  //     if (orientation === 'vertical') {
+  //       if (direction === 'down') {
+  //         return currentOffset + 1 < childCount;
+  //       } else if (direction === 'up') {
+  //         return currentOffset - 1 >= 0;
+  //       }
+  //     } else if (orientation === 'horizontal') {
+  //       if (direction === 'right') {
+  //         return currentOffset + 1 < childCount;
+  //       } else if (direction === 'left') {
+  //         return currentOffset - 1 >= 0;
+  //       }
+  //     }
+  //     return false;
+  //   },
+  //   [children, orientation],
+  // );
 
   const memoizedPanelStyles = useMemo(() => {
     const styles = {
-      flexDirection: getFlexDirection(direction),
+      flexDirection: getFlexDirection(orientation),
     };
-    if (direction === 'vertical') {
+    if (orientation === 'vertical') {
       styles.height = `${100 * Children.count(children)}vh`;
-    } else if (direction === 'horizontal') {
+    } else if (orientation === 'horizontal') {
       styles.width = `${100 * Children.count(children)}vw`;
     }
     return styles;
-  }, [direction, children]);
+  }, [orientation, children]);
 
   const panelStyles = {
     ...memoizedPanelStyles,
-    transform: !isHandlingDrag
-      ? getCssTranslationStr(direction, offset)
-      : getCssTranslationPxStr(direction, offset, dragState.offset),
+    transform: touchCoordinates
+      ? getCssTranslationPxStr(orientation, offset, touchCoordinates)
+      : getCssTranslationStr(orientation, offset),
   };
-
-  // console.log(panelStyles.transform);
-
 
   return (
     <div className={classes.FullPageContainer}>
       <div
         className={[
           classes.FullPageSection,
-          isHandlingAnimation && classes.Transition,
+          isHandlingAnimation ? classes['transition'] : null,
+          isHandlingDragAnimation ? classes['drag-transition'] : null,
         ].join(' ')}
         style={panelStyles}
         onTransitionEnd={() => {
-          setHandlingAnimation(false);
+          isHandlingAnimation
+            ? setHandlingAnimation(false)
+            : onEndDragAnimation();
         }}
-        onTouchStart={e => {
-          if (!isHandlingDrag && !isHandlingAnimation) {
+        onTouchStart={(e) => {
+          if (
+            !isHandlingDrag &&
+            !isHandlingDragAnimation &&
+            !startCoordinates
+          ) {
             const {screenX, screenY} = e.changedTouches[0];
-            setStartCoordinates({x: screenX, y: screenY});
+            dispatch(startTouchAction({x: screenX, y: screenY}));
           }
         }}
-        onTouchMove={e => {
-          const {screenX, screenY} = e.changedTouches[0];
-          if (!isHandlingDrag && !isHandlingAnimation) {
-            const direction = getTouchScrollDirection(
-              startCoordinates,
-              {
-                x: screenX,
-                y: screenY,
-              },
-              0,
-            );
-            if (navigableDirections.includes(direction)) {
-              e.stopPropagation();
-              setHandlingDrag(true);
-              dispatch({type: 'setDirection', direction});
-              setDragOffset({
+        onTouchMove={(e) => {
+          if (e.touches[0].identifier === 0) {
+            const {screenX, screenY} = e.touches[0];
+            if (
+              !isHandlingDrag &&
+              !isHandlingDragAnimation &&
+              startCoordinates
+            ) {
+              const targetCoordinates = {
                 x: screenX - startCoordinates.x,
                 y: screenY - startCoordinates.y,
-              });
-            }
-          } else {
-            if (dragState.direction) {
-              setDragOffset({
-                x: screenX - startCoordinates.x,
-                y: screenY - startCoordinates.y,
-              });
+              };
+              const targetOrientation = getTouchDragOrientation(
+                targetCoordinates,
+              );
+              if (targetOrientation === orientation) {
+                e.stopPropagation();
+                onStartDrag(targetOrientation);
+                dispatch(moveTouchAction(targetCoordinates));
+              }
+            } else {
+              if (touchCoordinates) {
+                e.stopPropagation();
+                dispatch(
+                  moveTouchAction({
+                    x: screenX - startCoordinates.x,
+                    y: screenY - startCoordinates.y,
+                  }),
+                );
+              }
             }
           }
         }}
-        onTouchEnd={e => {
-          const {screenX, screenY} = e.changedTouches[0];
-          const endCoordinates = {x: screenX, y: screenY};
-          const scrollDirection = getRelativeTouchScrollDirection(
-            startCoordinates,
-            endCoordinates,
-            direction,
-          );
-          dispatch({type: 'reset'});
-          if (scrollDirection) {
-            // handleScrollAction(scrollDirection, e);
+        onTouchEnd={(e) => {
+          if (
+            e.changedTouches.length === 0 || // Firefox RDM returns empty TouchList
+            e.changedTouches[0].identifier === 0
+          ) {
+            if (touchCoordinates) {
+              onEndDrag({orientation, touchCoordinates});
+            }
+            dispatch(endTouchAction());
           }
-          setHandlingDrag(false);
         }}
       >
-        {/* {childrenWithProps} */}
         {children}
       </div>
     </div>

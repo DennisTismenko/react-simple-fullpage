@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useReducer,
 } from 'react';
 import {
   constructFromDOM,
@@ -15,13 +16,33 @@ import {
   getScrollDirection,
   getArrowDirection,
   getHashValueFromURL,
+  parseHashValue,
+  getRelativeTouchDragDirection,
 } from '../../util/navUtil';
+
+import {
+  startDragAction,
+  endDragAction,
+  startDragAnimationAction,
+  endDragAnimationAction,
+} from '../actions/dragActions';
+
+import dragReducer from '../reducer/dragReducer';
+
+const initialDragState = {
+  isHandlingDrag: false,
+  isHandlingDragAnimation: false,
+  dragOrientation: null,
+};
 
 const FullPageContext = React.createContext(null);
 
-export const FullPage = ({children}) => {
+export const FullPage = ({updateHash = true, children}) => {
+  const [
+    {isHandlingDrag, isHandlingDragAnimation, dragOrientation},
+    dispatch,
+  ] = useReducer(dragReducer, initialDragState);
   const [isHandlingAnimation, setHandlingAnimation] = useState(false);
-  const [isHandlingDrag, setHandlingDrag] = useState(false);
   const [pageTree, setPageTree] = useState(constructFromDOM(children));
 
   const pageTreeDOMComponents = useMemo(() => {
@@ -35,10 +56,16 @@ export const FullPage = ({children}) => {
   // console.debug(pageTreeDOMComponents);
   // }, [pageTree, pageTreeDOMComponents]);
 
-  const handleTreeUpdate = useCallback((updatedPageTree) => {
-    setHandlingAnimation(true);
-    setPageTree(updatedPageTree);
-  }, []);
+  const handleTreeUpdate = useCallback(
+    (updatedPageTree, isDrag) => {
+      if (!isDrag) setHandlingAnimation(true);
+      if (updateHash && window.location.hash !== updatedPageTree.focused.path) {
+        window.location.hash = updatedPageTree.focused.path;
+      }
+      setPageTree(updatedPageTree);
+    },
+    [updateHash],
+  );
 
   const handleAction = useCallback(
     (e, actionType) => {
@@ -51,22 +78,47 @@ export const FullPage = ({children}) => {
           case 'key':
             direction = getArrowDirection(e);
             break;
+          case 'drag':
+            direction = getRelativeTouchDragDirection(e);
+            break;
           default:
             return;
         }
         if (!direction) return;
-        navigateAction(pageTree, direction, handleTreeUpdate);
+        const onSuccess = (updatedPageTree) =>
+          handleTreeUpdate(updatedPageTree, actionType === 'drag');
+        navigateAction(pageTree, direction, onSuccess);
       }
     },
     [handleTreeUpdate, isHandlingAnimation, pageTree],
   );
 
+  // const hasCollision = useCallback(
+  //   (dragOrientation, direction) => {
+  //     return pageHasCollision(pageTree.focused, dragOrientation, direction);
+  //   },
+  //   [pageTree.focused],
+  // );
+
   const handleNavigateTo = useCallback(
     (path) => {
-      navigateTo(pageTree, pageTree.pathMap.get(path), handleTreeUpdate);
+      if (!isHandlingAnimation && !isHandlingDragAnimation) {
+        navigateTo(pageTree, pageTree.pathMap.get(path), handleTreeUpdate);
+      }
     },
-    [pageTree, handleTreeUpdate],
+    [pageTree, handleTreeUpdate, isHandlingAnimation, isHandlingDragAnimation],
   );
+
+  // const navigate = useCallback(
+  //   (target) => {
+  //     if (isDirection(target)) {
+  //       navigateAction(pageTree, target, handleTreeUpdate);
+  //     } else {
+  //       handleNavigateTo(target);
+  //     }
+  //   },
+  //   [handleNavigateTo, handleTreeUpdate, pageTree],
+  // );
 
   useEffect(() => {
     const handleKeyboardAction = (e) => handleAction(e, 'key');
@@ -78,14 +130,43 @@ export const FullPage = ({children}) => {
 
   useEffect(() => {
     const hashChangeHandler = (e) => {
-      console.log('hash changed!')
       handleNavigateTo(getHashValueFromURL(e.newURL));
     };
     window.addEventListener('hashchange', hashChangeHandler);
     return () => {
       window.removeEventListener('hashchange', hashChangeHandler);
     };
-  });
+  }, [handleNavigateTo]);
+
+  useEffect(() => {
+    const path = parseHashValue(window.location.hash);
+    if (path) {
+      handleNavigateTo(path);
+    }
+    // Only needs to run on initial mount, no dependencies necessary
+    // eslint-disable-next-line
+  }, []);
+
+  const onStartDrag = useCallback(
+    (orientation) => dispatch(startDragAction(orientation)),
+    [],
+  );
+  const onEndDrag = useCallback(
+    (dragEvent) => {
+      handleAction(dragEvent, 'drag');
+      dispatch(endDragAction());
+    },
+    [handleAction],
+  );
+
+  const onStartDragAnimation = useCallback(
+    () => dispatch(startDragAnimationAction()),
+    [],
+  );
+  const onEndDragAnimation = useCallback(
+    () => dispatch(endDragAnimationAction()),
+    [],
+  );
 
   return (
     <div onWheel={(e) => handleAction(e, 'scroll')}>
@@ -93,8 +174,13 @@ export const FullPage = ({children}) => {
         value={{
           isHandlingAnimation,
           setHandlingAnimation,
+          onStartDrag,
+          onEndDrag,
+          onStartDragAnimation,
+          onEndDragAnimation,
           isHandlingDrag,
-          setHandlingDrag,
+          isHandlingDragAnimation,
+          dragOrientation,
         }}
       >
         {pageTreeDOMComponents}
