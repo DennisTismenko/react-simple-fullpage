@@ -1,181 +1,140 @@
-import React, {
-  Children,
-  useCallback,
-  useMemo,
-  useState,
-  useEffect,
-} from 'react';
+import React, {Children, useMemo, useReducer} from 'react';
 import classes from './FullPageSection.module.css';
-import {getScrollDirection} from '../../util/navUtil';
-import {incrementIfLte, decrementIfGte} from '../../util/mathUtil';
-import {getCssTranslationStr, getFlexDirection} from '../../util/cssUtil';
+import {
+  getFlexDirection,
+  getCssTranslationPxStr,
+  getCssTranslationStr,
+} from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
-import Page from './Page.react';
+import {getTouchDragOrientation} from '../../util/navUtil';
+import touchReducer from '../reducer/touchReducer';
+import {
+  startTouchAction,
+  moveTouchAction,
+  endTouchAction,
+} from '../actions/touchActions';
 
-const FullPageSection = ({
-  direction,
-  children,
-  _navigate = null,
-  _setPathInParent = null,
-}) => {
+const initialTouchState = {
+  startCoordinates: null,
+  touchCoordinates: null,
+  touchHistory: [],
+};
+
+const FullPageSection = ({orientation, loop, children, offset}) => {
   const {
     isHandlingAnimation,
     setHandlingAnimation,
-    navigateTo,
+    isHandlingDrag,
+    isHandlingDragAnimation,
+    onStartDrag,
+    onEndDrag,
+    onEndDragAnimation,
   } = useFullPageContext();
-  const [offset, setOffset] = useState(0);
-  const [childPaths, setChildPaths] = useState([]);
+  const [
+    {startCoordinates, touchCoordinates, touchHistory},
+    dispatch,
+  ] = useReducer(touchReducer, initialTouchState);
 
-  useEffect(() => {
-    if (_setPathInParent) {
-      const path =
-        children[offset].type === Page
-          ? children[offset].props.path
-          : childPaths[offset];
-      _setPathInParent(path);
-    }
-  }, [_setPathInParent, offset, children, childPaths]);
+  // useEffect(() => {
+  //   const clearTouchHistory = setTimeout(() => {
+  //     dispatch(clearTouchHistoryAction());
+  //   }, 200);
+  //   return () => {
+  //     clearTimeout(clearTouchHistory);
+  //   }
+  // }, [touchCoordinates]);
 
-  const panelStyles = useMemo(() => {
+  const memoizedPanelStyles = useMemo(() => {
     const styles = {
-      flexDirection: getFlexDirection(direction),
-      transform: getCssTranslationStr(direction, offset),
+      flexDirection: getFlexDirection(orientation),
     };
-    if (direction === 'vertical') {
+    if (orientation === 'vertical') {
       styles.height = `${100 * Children.count(children)}vh`;
-    } else if (direction === 'horizontal') {
+    } else if (orientation === 'horizontal') {
       styles.width = `${100 * Children.count(children)}vw`;
     }
     return styles;
-  }, [direction, children, offset]);
+  }, [orientation, children]);
 
-  const willAnimateValue = useCallback(
-    scrollDirection => {
-      switch (direction) {
-        case 'vertical':
-          if (scrollDirection === 'up' || scrollDirection === 'down') {
-            const newValue =
-              scrollDirection === 'up'
-                ? decrementIfGte(offset, 0)
-                : incrementIfLte(offset, Children.count(children) - 1);
-            return [newValue !== offset, newValue !== offset ? newValue : null];
-          }
-          break;
-        case 'horizontal':
-          if (scrollDirection === 'left' || scrollDirection === 'right') {
-            if (scrollDirection === 'left' || scrollDirection === 'right') {
-              const newValue =
-                scrollDirection === 'left'
-                  ? decrementIfGte(offset, 0)
-                  : incrementIfLte(offset, Children.count(children) - 1);
-              return [
-                newValue !== offset,
-                newValue !== offset ? newValue : null,
-              ];
-            }
-          }
-          break;
-        default:
-          return [false, null];
-      }
-      return [false, null];
-    },
-    [direction, children, offset],
-  );
-
-  const childrenWithProps = useMemo(() => {
-    return Children.map(children, (child, index) => {
-      const childProps = {
-        _navigate: () => {
-          if (_navigate) {
-            _navigate();
-          }
-          setOffset(index);
-        },
-        _focused: index === offset,
-      };
-      if (child.type === FullPageSection) {
-        childProps._setPathInParent = path => {
-          setChildPaths(prevPaths => {
-            const childPaths = [...prevPaths];
-            childPaths[index] = path;
-            return childPaths;
-          });
-        };
-      }
-      return React.cloneElement(child, childProps);
-    });
-  }, [children, _navigate, offset]);
-
-  const getPathFromOffset = useCallback(
-    offsetVal => {
-      return children[offsetVal].type === Page
-        ? children[offsetVal].props.path
-        : childPaths[offsetVal];
-    },
-    [childPaths, children],
-  );
-
-  const updateParentPath = useCallback(
-    path => {
-      if (_setPathInParent) _setPathInParent(path);
-    },
-    [_setPathInParent],
-  );
-
-  const updateParentAndRoute = useCallback(
-    path => {
-      updateParentPath(path);
-      navigateTo(path);
-    },
-    [updateParentPath, navigateTo],
-  );
-
-  const handleScrollAction = useCallback(
-    (scrollDirection, event) => {
-      if (!isHandlingAnimation) {
-        const [willAnimate, newOffset] = willAnimateValue(scrollDirection);
-        if (willAnimate) {
-          event.stopPropagation();
-          setHandlingAnimation(true);
-          updateParentAndRoute(getPathFromOffset(newOffset));
-        }
-      }
-    },
-    [
-      isHandlingAnimation,
-      setHandlingAnimation,
-      willAnimateValue,
-      getPathFromOffset,
-      updateParentAndRoute,
-    ],
-  );
-
-  // TODO: this implementation of KeyListener will NOT work for complex nested FullPageSections, and thus should be deleted
-  // useEffect(() => {
-  //   const keyListener = e => {
-  //     const arrowDirection = getArrowDirection(e);
-  //     if (arrowDirection) {
-  //       handleScrollAction(arrowDirection, e);
-  //     }
-  //   };
-  //   window.addEventListener('keydown', keyListener);
-  //   return () => window.removeEventListener('keydown', keyListener);
-  // }, [handleScrollAction]);
+  const panelStyles = {
+    ...memoizedPanelStyles,
+    transform: touchCoordinates
+      ? getCssTranslationPxStr(orientation, offset, touchCoordinates)
+      : getCssTranslationStr(orientation, offset),
+  };
 
   return (
     <div className={classes.FullPageContainer}>
       <div
-        className={classes.FullPageSection}
+        className={[
+          classes.FullPageSection,
+          isHandlingAnimation ? classes['transition'] : null,
+          isHandlingDragAnimation ? classes['drag-transition'] : null,
+        ].join(' ')}
         style={panelStyles}
-        onWheel={e => {
-          handleScrollAction(getScrollDirection(e), e);
-        }}
         onTransitionEnd={() => {
-          setHandlingAnimation(false);
+          isHandlingAnimation
+            ? setHandlingAnimation(false)
+            : onEndDragAnimation();
+        }}
+        onTouchStart={(e) => {
+          if (
+            !isHandlingDrag &&
+            !isHandlingDragAnimation &&
+            !startCoordinates
+          ) {
+            const {screenX, screenY} = e.changedTouches[0];
+            dispatch(startTouchAction({x: screenX, y: screenY}));
+          }
+        }}
+        onTouchMove={(e) => {
+          if (e.touches[0].identifier === 0) {
+            const {screenX, screenY} = e.touches[0];
+            if (
+              !isHandlingDrag &&
+              !isHandlingDragAnimation &&
+              startCoordinates
+            ) {
+              const targetCoordinates = {
+                x: screenX - startCoordinates.x,
+                y: screenY - startCoordinates.y,
+                time: new Date().getTime()
+              };
+              const targetOrientation = getTouchDragOrientation(
+                targetCoordinates,
+              );
+              if (targetOrientation === orientation) {
+                e.stopPropagation();
+                onStartDrag(targetOrientation);
+                dispatch(moveTouchAction(targetCoordinates));
+              }
+            } else {
+              if (touchCoordinates) {
+                e.stopPropagation();
+                dispatch(
+                  moveTouchAction({
+                    x: screenX - startCoordinates.x,
+                    y: screenY - startCoordinates.y,
+                    time: new Date().getTime(),
+                  }),
+                );
+              }
+            }
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (
+            e.changedTouches.length === 0 || // Firefox RDM returns empty TouchList
+            e.changedTouches[0].identifier === 0
+          ) {
+            if (touchCoordinates) {
+              onEndDrag({orientation, touchCoordinates, touchHistory});
+            }
+            dispatch(endTouchAction());
+          }
         }}
       >
-        {childrenWithProps}
+        {children}
       </div>
     </div>
   );
