@@ -1,7 +1,7 @@
 import {getTouchVelocity} from './mathUtil';
 
 const SCREEN_RATIO = 1 / 2;
-const VELOCITY_THRESHOLD = 1; // 1 px/ms
+const VELOCITY_THRESHOLD = 1; // px/ms
 
 const keyDirections = {
   ArrowLeft: 'left',
@@ -67,15 +67,6 @@ export const getArrowDirection = (e) => {
 //     }
 //   }
 //   return null;
-// };
-
-// export const getFirstTouch = (changedTouches) => {
-//   if (changedTouches.length === 1) return changedTouches[0];
-//   for (let i = 0; i < changedTouches.length; i++) {
-//     if (changedTouches[i].identifier === 0) {
-//       return changedTouches[i];
-//     }
-//   }
 // };
 
 export const getTouchDragDirection = (touchCoordinates) => {

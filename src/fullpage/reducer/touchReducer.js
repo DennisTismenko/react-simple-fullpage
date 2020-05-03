@@ -34,10 +34,6 @@ const endTouch = () => {
   };
 };
 
-const clearTouchHistory = (state) => {
-  return {...state, touchHistory: []};
-};
-
 const touchReducer = (state, action) => {
   switch (action.type) {
     case touchActionTypes.START_TOUCH:
@@ -46,8 +42,6 @@ const touchReducer = (state, action) => {
       return moveTouch(state, action);
     case touchActionTypes.END_TOUCH:
       return endTouch();
-    case touchActionTypes.CLEAR_HISTORY:
-      return clearTouchHistory(state);
     default:
       return state;
   }
