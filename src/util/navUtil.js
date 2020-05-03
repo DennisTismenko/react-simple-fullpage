@@ -1,3 +1,8 @@
+import {getTouchVelocity} from './mathUtil';
+
+const SCREEN_RATIO = 1 / 2;
+const VELOCITY_THRESHOLD = 1; // 1 px/ms
+
 const keyDirections = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
@@ -95,19 +100,28 @@ export const getRelativeTouchDragDirection = (
   touchEvent,
   withThreshold = true,
 ) => {
-  const {orientation, touchCoordinates} = touchEvent;
+  const {orientation, touchCoordinates, touchHistory} = touchEvent;
   const {x, y} = touchCoordinates;
   const threshold = withThreshold
     ? orientation === 'vertical'
-      ? window.innerHeight / 2
-      : window.innerWidth / 2
+      ? window.innerHeight * SCREEN_RATIO
+      : window.innerWidth * SCREEN_RATIO
     : 0;
+  const touchVelocity = getTouchVelocity(touchHistory, orientation);
   if (orientation === 'vertical') {
     const absDy = Math.abs(y);
-    return absDy > threshold ? (y > 0 ? 'up' : 'down') : null;
+    return absDy > threshold || touchVelocity > VELOCITY_THRESHOLD
+      ? y > 0
+        ? 'up'
+        : 'down'
+      : null;
   } else if (orientation === 'horizontal') {
     const absDx = Math.abs(x);
-    return absDx > threshold ? (x > 0 ? 'left' : 'right') : null;
+    return absDx > threshold || touchVelocity > VELOCITY_THRESHOLD
+      ? x > 0
+        ? 'left'
+        : 'right'
+      : null;
   } else {
     return null;
   }

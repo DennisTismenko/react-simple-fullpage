@@ -6,9 +6,7 @@ import {
   getCssTranslationStr,
 } from '../../util/cssUtil';
 import {useFullPageContext} from '../context/FullPage.react';
-import {
-  getTouchDragOrientation,
-} from '../../util/navUtil';
+import {getTouchDragOrientation} from '../../util/navUtil';
 import touchReducer from '../reducer/touchReducer';
 import {
   startTouchAction,
@@ -19,6 +17,7 @@ import {
 const initialTouchState = {
   startCoordinates: null,
   touchCoordinates: null,
+  touchHistory: [],
 };
 
 const FullPageSection = ({orientation, loop, children, offset}) => {
@@ -31,32 +30,19 @@ const FullPageSection = ({orientation, loop, children, offset}) => {
     onEndDrag,
     onEndDragAnimation,
   } = useFullPageContext();
-  const [{startCoordinates, touchCoordinates}, dispatch] = useReducer(
-    touchReducer,
-    initialTouchState,
-  );
+  const [
+    {startCoordinates, touchCoordinates, touchHistory},
+    dispatch,
+  ] = useReducer(touchReducer, initialTouchState);
 
-  // const canNavigateToDirection = useCallback(
-  //   (direction, targetOrientation, currentOffset) => {
-  //     if (targetOrientation !== orientation) return false;
-  //     const childCount = Children.count(children);
-  //     if (orientation === 'vertical') {
-  //       if (direction === 'down') {
-  //         return currentOffset + 1 < childCount;
-  //       } else if (direction === 'up') {
-  //         return currentOffset - 1 >= 0;
-  //       }
-  //     } else if (orientation === 'horizontal') {
-  //       if (direction === 'right') {
-  //         return currentOffset + 1 < childCount;
-  //       } else if (direction === 'left') {
-  //         return currentOffset - 1 >= 0;
-  //       }
-  //     }
-  //     return false;
-  //   },
-  //   [children, orientation],
-  // );
+  // useEffect(() => {
+  //   const clearTouchHistory = setTimeout(() => {
+  //     dispatch(clearTouchHistoryAction());
+  //   }, 200);
+  //   return () => {
+  //     clearTimeout(clearTouchHistory);
+  //   }
+  // }, [touchCoordinates]);
 
   const memoizedPanelStyles = useMemo(() => {
     const styles = {
@@ -112,6 +98,7 @@ const FullPageSection = ({orientation, loop, children, offset}) => {
               const targetCoordinates = {
                 x: screenX - startCoordinates.x,
                 y: screenY - startCoordinates.y,
+                time: new Date().getTime()
               };
               const targetOrientation = getTouchDragOrientation(
                 targetCoordinates,
@@ -128,6 +115,7 @@ const FullPageSection = ({orientation, loop, children, offset}) => {
                   moveTouchAction({
                     x: screenX - startCoordinates.x,
                     y: screenY - startCoordinates.y,
+                    time: new Date().getTime(),
                   }),
                 );
               }
@@ -140,7 +128,7 @@ const FullPageSection = ({orientation, loop, children, offset}) => {
             e.changedTouches[0].identifier === 0
           ) {
             if (touchCoordinates) {
-              onEndDrag({orientation, touchCoordinates});
+              onEndDrag({orientation, touchCoordinates, touchHistory});
             }
             dispatch(endTouchAction());
           }

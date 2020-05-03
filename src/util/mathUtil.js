@@ -98,3 +98,23 @@ export const hash = (str) => {
 
   return h1 >>> 0;
 };
+
+export const getTouchVelocity = (coordinateArray, orientation) => {
+  let axis;
+  switch (orientation) {
+    case 'horizontal':
+      axis = 'x';
+      break;
+    case 'vertical':
+      axis = 'y';
+      break;
+    default:
+      throw new Error(`Invalid orientation: ${orientation}`);
+  }
+  const startCoordinate = coordinateArray[0];
+  const endCoordinate = coordinateArray[coordinateArray.length - 1];
+
+  const deltaDistance = endCoordinate[axis] - startCoordinate[axis];
+  const deltaTime = endCoordinate.time - startCoordinate.time;
+  return Math.abs(deltaDistance / deltaTime);
+};
