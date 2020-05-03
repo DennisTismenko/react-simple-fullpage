@@ -1,7 +1,7 @@
 import React from 'react';
-import FullPageSection from '../fullpage/components/FullPageSection.react';
-import Page from '../fullpage/components/Page.react';
-import {FullPage} from '../fullpage/context/FullPage.react';
+import FullPageSection from '../../../src/fullpage/components/FullPageSection.react';
+import Page from '../../../src/fullpage/components/Page.react';
+import {FullPage} from '../../../src/fullpage/context/FullPage.react';
 import classes from './Root.module.css';
 
 const Root = () => {
